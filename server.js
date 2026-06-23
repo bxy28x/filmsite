@@ -44,8 +44,8 @@ app.post('/api/m3u8', async (req, res) => {
   let browser;
   try {
     browser = await puppeteer.launch({ 
-      headless: false,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--autoplay-policy=no-user-gesture-required']
+headless: true,
+executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     });
 
     let streamUrl = null;
