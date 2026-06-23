@@ -43,10 +43,18 @@ app.post('/api/m3u8', async (req, res) => {
 
   let browser;
   try {
-    browser = await puppeteer.launch({ 
-headless: true,
-executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    });
+browser = await puppeteer.launch({ 
+  headless: true,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--no-first-run',
+    '--no-zygote',
+    '--single-process'
+  ]
+});
 
     let streamUrl = null;
     const page = await browser.newPage();
