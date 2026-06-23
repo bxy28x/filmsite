@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FilmStream</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    background: #0a0a0f;
+    color: #fff;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #111118;
+    border-bottom: 1px solid #222;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #e50914;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .search-bar {
+    display: flex;
+    flex: 1;
+    max-width: 600px;
+    gap: 8px;
+  }
+
+  .search-bar input {
+    flex: 1;
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-bar input:focus { border-color: #e50914; }
+
+  .search-bar button {
+    background: #e50914;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.2s;
+  }
+
+  .search-bar button:hover { background: #c1070f; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .hero h1 {
+    font-size: 3rem;
+    font-weight: 900;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #fff, #e50914);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero p { color: #888; font-size: 1.1rem; }
+
+  /* Results Grid */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .film-card {
+    background: #111118;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #222;
+  }
+
+  .film-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 32px rgba(229,9,20,0.3);
+  }
+
+  .film-card img {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    display: block;
+    background: #1a1a2e;
+  }
+
+  .film-card-info {
+    padding: 10px;
+  }
+
+  .film-card-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .film-card-meta {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 4px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .badge {
+    background: #e50914;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  .badge.dual { background: #1a6fe0; }
+  .badge.dizi { background: #7c3aed; }
+
+  /* Player Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 1000;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal.active { display: flex; }
+
+  .modal-inner {
+    width: 100%;
+    max-width: 900px;
+    background: #111118;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #333;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #222;
+  }
+
+  .modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .modal-close {
+    background: #333;
+    border: none;
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+
+  .modal-close:hover { background: #e50914; }
+
+  .player-wrap {
+    position: relative;
+    aspect-ratio: 16/9;
+    background: #000;
+  }
+
+  .player-wrap video {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .player-status {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: #000;
+  }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #333;
+    border-top-color: #e50914;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .status-text { color: #888; font-size: 0.95rem; }
+
+  .not-found {
+    text-align: center;
+    padding: 20px;
+    color: #e50914;
+    font-weight: 600;
+  }
+
+  /* Loading state */
+  .loading-card {
+    background: #111118;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #222;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, #1a1a2e 25%, #252540 50%, #1a1a2e 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  .skeleton-img { width: 100%; aspect-ratio: 2/3; }
+  .skeleton-text { height: 12px; margin: 10px; border-radius: 4px; }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 2rem; }
+    header { flex-direction: column; align-items: stretch; }
+    .results-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo">🎬 FilmStream</a>
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Film veya dizi ara..." />
+    <button onclick="search()">Ara</button>
+  </div>
+</header>
+
+<div class="container">
+  <div id="hero" class="hero">
+    <h1>Film & Dizi İzle</h1>
+    <p>Türkçe dublaj ve altyazılı binlerce film ve dizi</p>
+  </div>
+
+  <div id="results" class="results-grid"></div>
+</div>
+
+<!-- Player Modal -->
+<div class="modal" id="modal">
+  <div class="modal-inner">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">-</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="player-wrap">
+      <video id="video" controls></video>
+      <div class="player-status" id="playerStatus">
+        <div class="spinner"></div>
+        <span class="status-text" id="statusText">Video yükleniyor...</span>
+      </div>
+    </div>
+    <div id="notFound" class="not-found" style="display:none;">
+      ⚠️ Bu film için video bulunamadı.
+    </div>
+  </div>
+</div>
+
+<script>
+const searchInput = document.getElementById('searchInput');
+const resultsDiv = document.getElementById('results');
+const hero = document.getElementById('hero');
+let hls = null;
+
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') search();
+});
+
+async function search() {
+  const query = searchInput.value.trim();
+  if (!query) return;
+
+  hero.style.display = 'none';
+  showSkeletons();
+
+  try {
+    const res = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const data = await res.json();
+    renderResults(data.results || []);
+  } catch(e) {
+    resultsDiv.innerHTML = '<p style="color:#888;text-align:center;padding:40px">Bir hata oluştu, tekrar deneyin.</p>';
+  }
+}
+
+function showSkeletons() {
+  resultsDiv.innerHTML = Array(8).fill(`
+    <div class="loading-card">
+      <div class="skeleton skeleton-img"></div>
+      <div class="skeleton skeleton-text"></div>
+      <div class="skeleton skeleton-text" style="width:60%"></div>
+    </div>
+  `).join('');
+}
+
+function renderResults(results) {
+  if (!results.length) {
+    resultsDiv.innerHTML = '<p style="color:#888;text-align:center;padding:40px;grid-column:1/-1">Sonuç bulunamadı.</p>';
+    return;
+  }
+
+  resultsDiv.innerHTML = results.map(film => {
+    const thumb = film.thumb_url ? 
+      (film.thumb_url.startsWith('http') ? film.thumb_url : `https://www.hdfilmizle.now${film.thumb_url}`) 
+      : '';
+    const lang = film.lang || '';
+    const type = film.type || 'film';
+    const badgeText = type === 'dizi' ? 'Dizi' : (lang === 'dual' ? 'Dual' : 'Türkçe');
+    const badgeClass = type === 'dizi' ? 'dizi' : (lang === 'dual' ? 'dual' : '');
+
+    return `
+      <div class="film-card" onclick="openPlayer('${film.slug}', '${type}', '${(film.name||'').replace(/'/g,"\\'")}')">
+        <img src="${thumb}" alt="${film.name}" loading="lazy" onerror="this.style.background='#1a1a2e'">
+        <div class="film-card-info">
+          <div class="film-card-title">${film.name || '-'}</div>
+          <div class="film-card-meta">
+            <span>${film.year || ''}</span>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openPlayer(slug, type, title) {
+  document.getElementById('modal').classList.add('active');
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('playerStatus').style.display = 'flex';
+  document.getElementById('notFound').style.display = 'none';
+  document.getElementById('statusText').textContent = 'Video aranıyor...';
+  document.getElementById('video').style.display = 'none';
+
+  if (hls) { hls.destroy(); hls = null; }
+
+  try {
+    const res = await fetch('/api/m3u8', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, type })
+    });
+    const data = await res.json();
+
+    if (data.found && data.url) {
+      playM3u8(data.url);
+    } else {
+      document.getElementById('playerStatus').style.display = 'none';
+      document.getElementById('notFound').style.display = 'block';
+    }
+  } catch(e) {
+    document.getElementById('playerStatus').style.display = 'none';
+    document.getElementById('notFound').style.display = 'block';
+  }
+}
+
+function playM3u8(url) {
+  const video = document.getElementById('video');
+  video.style.display = 'block';
+  document.getElementById('statusText').textContent = 'Yükleniyor...';
+
+  if (Hls.isSupported()) {
+    hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      document.getElementById('playerStatus').style.display = 'none';
+      video.play();
+    });
+    hls.on(Hls.Events.ERROR, (e, data) => {
+      if (data.fatal) {
+        document.getElementById('playerStatus').style.display = 'none';
+        document.getElementById('notFound').style.display = 'block';
+      }
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
+    video.addEventListener('loadedmetadata', () => {
+      document.getElementById('playerStatus').style.display = 'none';
+      video.play();
+    });
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  const video = document.getElementById('video');
+  video.pause();
+  video.src = '';
+  if (hls) { hls.destroy(); hls = null; }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+</body>
+</html>
